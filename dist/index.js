@@ -1,0 +1,40 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const ws_1 = require("ws");
+const wss = new ws_1.WebSocketServer({ port: 8080 });
+let allSockets = [];
+wss.on("connection", (socket) => {
+    socket.on("message", (message) => {
+        const parsedMessage = JSON.parse(message);
+        if (parsedMessage.type === "join") {
+            console.log("User joined room " + parsedMessage.payload.roomId);
+            allSockets.push({
+                socket,
+                room: parsedMessage.payload.roomId,
+            });
+        }
+        if (parsedMessage.type === "chat") {
+            let currentUserRoom = null;
+            console.log("Message received for room: " + parsedMessage.payload.roomId);
+            for (let i = 0; i < allSockets.length; i++) {
+                if (allSockets[i].socket === socket) {
+                    currentUserRoom = allSockets[i].room;
+                }
+            }
+            if (currentUserRoom) {
+                for (let i = 0; i < allSockets.length; i++) {
+                    if (allSockets[i].room === currentUserRoom) {
+                        allSockets[i].socket.send(JSON.stringify({
+                            type: "chat",
+                            payload: { message: parsedMessage.payload.message }
+                        }));
+                    }
+                }
+            }
+        }
+    });
+    socket.on("close", () => {
+        allSockets = allSockets.filter((user) => user.socket !== socket);
+        console.log("User disconnected");
+    });
+});
